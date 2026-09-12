@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { parseLabelText, recognizeLabelText } from '../lib/ocr'
+import { parseLabelText, preprocessForOcr, recognizeLabelText } from '../lib/ocr'
 import type { ParsedLabel } from '../lib/ocr'
 
 interface Props {
@@ -24,7 +24,9 @@ export default function ScanToAdd({ onClose, onCaptured }: Props) {
   useEffect(() => {
     let cancelled = false
     navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: 'environment' } })
+      ?.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+      })
       .then((stream) => {
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop())
@@ -52,7 +54,8 @@ export default function ScanToAdd({ onClose, onCaptured }: Props) {
 
     setStatus('reading')
     try {
-      const text = await recognizeLabelText(photoDataUrl)
+      const ocrInput = preprocessForOcr(canvas)
+      const text = await recognizeLabelText(ocrInput)
       onCaptured(photoDataUrl, parseLabelText(text))
     } catch {
       onCaptured(photoDataUrl, {})
