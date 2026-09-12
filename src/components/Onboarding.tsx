@@ -1,13 +1,13 @@
 import { useState } from 'react'
-import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import type { ConsentState } from '../types'
 import { DEFAULT_CONSENTS } from '../types'
 
 const ITEMS: { key: keyof Omit<ConsentState, 'consentedAt'>; title: string; body: string; required?: boolean }[] = [
   {
     key: 'essentialStorage',
-    title: 'Store my medications on this device',
-    body: 'Required to use Medicina. Your medication list and dose history are saved only in this browser’s local storage — never uploaded to a server.',
+    title: 'Store my medications in my Medicina account',
+    body: 'Required to use Medicina. Your medication list and dose history are stored in your account so they’re available across your devices — nothing is sold or shared with third parties.',
     required: true,
   },
   {
@@ -18,7 +18,7 @@ const ITEMS: { key: keyof Omit<ConsentState, 'consentedAt'>; title: string; body
   {
     key: 'smsWhatsappFallback',
     title: 'Escalate to SMS/WhatsApp if I miss a reminder',
-    body: 'If a push reminder isn’t acknowledged within 15 minutes, Medicina logs a fallback message it would send (MVP demo — no real carrier is connected yet).',
+    body: 'If a reminder isn’t acknowledged within 15 minutes, the server sends a fallback text to your phone number (set one in Settings). Real delivery requires an SMS provider to be configured on the backend — until then, attempts are only logged.',
   },
   {
     key: 'caregiverAlerts',
@@ -28,12 +28,22 @@ const ITEMS: { key: keyof Omit<ConsentState, 'consentedAt'>; title: string; body
 ]
 
 export default function Onboarding() {
-  const { setConsents } = useApp()
+  const { updateConsents } = useAuth()
   const [consents, setLocal] = useState<ConsentState>(DEFAULT_CONSENTS)
+  const [submitting, setSubmitting] = useState(false)
 
   const toggle = (key: keyof ConsentState) => {
     if (key === 'essentialStorage') return
     setLocal((c) => ({ ...c, [key]: !c[key as keyof ConsentState] }))
+  }
+
+  const continue_ = async () => {
+    setSubmitting(true)
+    try {
+      await updateConsents({ ...consents, essentialStorage: true })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -41,7 +51,7 @@ export default function Onboarding() {
       <div className="onboarding-card">
         <h1>Welcome to Medicina</h1>
         <p className="muted">
-          A private, on-device medication reminder. This isn’t medical advice — Medicina only helps you
+          A private, GDPR-conscious medication reminder. This isn’t medical advice — Medicina only helps you
           remember doses you’ve told it about.
         </p>
 
@@ -73,15 +83,12 @@ export default function Onboarding() {
           ))}
         </ul>
 
-        <button
-          className="primary"
-          onClick={() => setConsents({ ...consents, essentialStorage: true })}
-        >
-          Continue
+        <button className="primary" onClick={continue_} disabled={submitting}>
+          {submitting ? 'Saving…' : 'Continue'}
         </button>
         <p className="muted small legal">
-          You can change any of these choices later in Settings → Privacy, including permanently deleting all
-          stored data.
+          You can change any of these choices later in Settings → Privacy, including permanently deleting your
+          account and all stored data.
         </p>
       </div>
     </div>

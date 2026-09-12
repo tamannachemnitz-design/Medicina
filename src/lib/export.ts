@@ -1,15 +1,20 @@
-import type { AppState } from '../types'
+import type { DoseEvent, Medication } from '../types'
 import { historyByDay } from './adherence'
+
+interface ExportData {
+  medications: Medication[]
+  doseEvents: DoseEvent[]
+}
 
 function escapeCsv(v: string): string {
   return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 }
 
-export function buildAdherenceCsv(state: AppState): string {
+export function buildAdherenceCsv(data: ExportData): string {
   const rows = [['Date', 'Time', 'Medication', 'Dose', 'Status']]
-  for (const day of historyByDay(state.doseEvents)) {
+  for (const day of historyByDay(data.doseEvents)) {
     for (const e of day.events.sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor))) {
-      const med = state.medications.find((m) => m.id === e.medicationId)
+      const med = data.medications.find((m) => m.id === e.medicationId)
       const dt = new Date(e.scheduledFor)
       rows.push([
         day.date,
@@ -23,8 +28,8 @@ export function buildAdherenceCsv(state: AppState): string {
   return rows.map((r) => r.map(escapeCsv).join(',')).join('\n')
 }
 
-export function downloadCsv(state: AppState): void {
-  const csv = buildAdherenceCsv(state)
+export function downloadCsv(data: ExportData): void {
+  const csv = buildAdherenceCsv(data)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -34,14 +39,14 @@ export function downloadCsv(state: AppState): void {
   URL.revokeObjectURL(url)
 }
 
-export function buildDoctorReportHtml(state: AppState): string {
-  const days = historyByDay(state.doseEvents)
+export function buildDoctorReportHtml(data: ExportData): string {
+  const days = historyByDay(data.doseEvents)
   const rows = days
     .map((day) => {
       const items = day.events
         .sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor))
         .map((e) => {
-          const med = state.medications.find((m) => m.id === e.medicationId)
+          const med = data.medications.find((m) => m.id === e.medicationId)
           const time = new Date(e.scheduledFor).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           return `<li>${time} — ${med?.name ?? 'Unknown'} (${med?.dose ?? ''}): <strong>${e.status}</strong></li>`
         })
@@ -72,8 +77,8 @@ export function buildDoctorReportHtml(state: AppState): string {
 </body></html>`
 }
 
-export function openDoctorReport(state: AppState): void {
-  const html = buildDoctorReportHtml(state)
+export function openDoctorReport(data: ExportData): void {
+  const html = buildDoctorReportHtml(data)
   const win = window.open('', '_blank')
   if (!win) return
   win.document.write(html)

@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { AppProvider, useApp } from './context/AppContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { AppProvider } from './context/AppContext'
+import Auth from './components/Auth'
 import Onboarding from './components/Onboarding'
 import Today from './components/Today'
 import MedicationList from './components/MedicationList'
@@ -18,10 +20,7 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 ]
 
 function Shell() {
-  const { state } = useApp()
   const [tab, setTab] = useState<Tab>('today')
-
-  if (!state.onboarded) return <Onboarding />
 
   return (
     <div className="app-shell">
@@ -47,10 +46,24 @@ function Shell() {
   )
 }
 
-export default function App() {
+function Gate() {
+  const { user, loading } = useAuth()
+
+  if (loading) return null
+  if (!user) return <Auth />
+  if (!user.consents.essentialStorage) return <Onboarding />
+
   return (
     <AppProvider>
       <Shell />
     </AppProvider>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Gate />
+    </AuthProvider>
   )
 }

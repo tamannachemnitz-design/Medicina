@@ -24,6 +24,8 @@ export default function MedicationForm({ editing, onDone }: Props) {
   const [notes, setNotes] = useState(editing?.notes ?? '')
   const [showScan, setShowScan] = useState(false)
   const [scanPhoto, setScanPhoto] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const changeFrequency = (f: Frequency) => {
     setFrequency(f)
@@ -37,13 +39,21 @@ export default function MedicationForm({ editing, onDone }: Props) {
   const addTime = () => setTimes((t) => [...t, '12:00'])
   const removeTime = (i: number) => setTimes((t) => t.filter((_, idx) => idx !== i))
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !dose.trim() || times.length === 0) return
     const payload = { name: name.trim(), dose: dose.trim(), frequency, times, notes: notes.trim(), active: true }
-    if (editing) updateMedication(editing.id, payload)
-    else addMedication(payload)
-    onDone()
+    setSaving(true)
+    setError(null)
+    try {
+      if (editing) await updateMedication(editing.id, payload)
+      else await addMedication(payload)
+      onDone()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save this medication')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -58,7 +68,9 @@ export default function MedicationForm({ editing, onDone }: Props) {
       {scanPhoto && (
         <div className="scan-thumb-row">
           <img src={scanPhoto} alt="Captured medication label" className="scan-thumb" />
-          <span className="muted small">Photo captured — fill in the details below.</span>
+          <span className="muted small">
+            Photo captured — check the details below, since label reading isn't perfect.
+          </span>
         </div>
       )}
 
@@ -103,12 +115,14 @@ export default function MedicationForm({ editing, onDone }: Props) {
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
         </label>
 
+        {error && <p className="error-text">{error}</p>}
+
         <div className="modal-actions">
           <button type="button" className="ghost" onClick={onDone}>
             Cancel
           </button>
-          <button type="submit" className="primary">
-            {editing ? 'Save changes' : 'Add medication'}
+          <button type="submit" className="primary" disabled={saving}>
+            {saving ? 'Saving…' : editing ? 'Save changes' : 'Add medication'}
           </button>
         </div>
       </form>
@@ -116,8 +130,10 @@ export default function MedicationForm({ editing, onDone }: Props) {
       {showScan && (
         <ScanToAdd
           onClose={() => setShowScan(false)}
-          onCaptured={(photo) => {
+          onCaptured={(photo, parsed) => {
             setScanPhoto(photo)
+            if (parsed.name && !name) setName(parsed.name)
+            if (parsed.dose && !dose) setDose(parsed.dose)
             setShowScan(false)
           }}
         />

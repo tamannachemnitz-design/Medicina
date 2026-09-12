@@ -11,9 +11,9 @@ const STATUS_ICON: Record<string, string> = {
 
 export default function History() {
   const { state } = useApp()
-  const streak = currentStreak(state.doseEvents)
-  const rate = adherenceRate(state.doseEvents)
-  const days = historyByDay(state.doseEvents).slice(0, 30)
+  const streak = currentStreak(state.history)
+  const rate = adherenceRate(state.history)
+  const days = historyByDay(state.history).slice(0, 30)
 
   return (
     <div className="screen">

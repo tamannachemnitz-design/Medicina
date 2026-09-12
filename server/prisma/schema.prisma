@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                         String   @id @default(cuid())
+  email                      String   @unique
+  passwordHash               String
+  phone                      String?
+  consentEssentialStorage    Boolean  @default(false)
+  consentReminders           Boolean  @default(false)
+  consentCaregiverAlerts     Boolean  @default(false)
+  consentSmsWhatsappFallback Boolean  @default(false)
+  consentedAt                DateTime?
+  createdAt                  DateTime @default(now())
+
+  medications Medication[]
+  doseEvents  DoseEvent[]
+  caregivers  Caregiver[]
+  alertLog    AlertLog[]
+}
+
+model Medication {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  dose      String
+  frequency String
+  times     String // JSON-encoded string[] of "HH:MM"
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  doseEvents DoseEvent[]
+}
+
+model DoseEvent {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  scheduledFor DateTime
+  status       String    @default("pending")
+  actedAt      DateTime?
+  notifiedAt   DateTime?
+  escalatedAt  DateTime?
+
+  @@index([userId, scheduledFor])
+}
+
+model Caregiver {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String
+  consentGiven Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model AlertLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel      String
+  medicationId String
+  doseEventId  String
+  target       String
+  message      String
+  delivery     String   @default("logged")
+  sentAt       DateTime @default(now())
+}

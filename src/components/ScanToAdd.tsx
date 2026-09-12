@@ -1,21 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
+import { parseLabelText, recognizeLabelText } from '../lib/ocr'
+import type { ParsedLabel } from '../lib/ocr'
 
 interface Props {
   onClose: () => void
-  onCaptured: (photoDataUrl: string) => void
+  onCaptured: (photoDataUrl: string, parsed: ParsedLabel) => void
 }
 
 /**
- * Camera capture for the "scan-to-add" wedge feature (competitive analysis §5.2).
- * Label/barcode OCR is a real, non-trivial integration (on-device ML model or a
- * cloud OCR API) that's out of scope for this MVP — this component wires up the
- * camera and capture flow, then hands the photo back so the medication form can
- * be pre-opened for manual entry. Swapping in real text recognition later only
- * means replacing `onCaptured`'s consumer, not this component.
+ * Camera capture + on-device OCR for the "scan-to-add" wedge feature
+ * (competitive analysis §5.2). Runs entirely in the browser via tesseract.js —
+ * no photo or recognized text is sent anywhere, keeping the privacy-first
+ * story intact. Label text recognition is inherently noisy on small,
+ * curved, or glossy pharmacy labels, so this only pre-fills a best guess;
+ * the medication form always opens for the user to confirm or correct it.
  */
 export default function ScanToAdd({ onClose, onCaptured }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<'camera' | 'reading'>('camera')
   const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
@@ -38,37 +41,46 @@ export default function ScanToAdd({ onClose, onCaptured }: Props) {
     }
   }, [])
 
-  const capture = () => {
+  const capture = async () => {
     const video = videoRef.current
     if (!video || !video.videoWidth) return
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
     canvas.getContext('2d')?.drawImage(video, 0, 0)
-    onCaptured(canvas.toDataURL('image/jpeg', 0.85))
+    const photoDataUrl = canvas.toDataURL('image/jpeg', 0.85)
+
+    setStatus('reading')
+    try {
+      const text = await recognizeLabelText(photoDataUrl)
+      onCaptured(photoDataUrl, parseLabelText(text))
+    } catch {
+      onCaptured(photoDataUrl, {})
+    }
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={status === 'reading' ? undefined : onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>Scan medication label</h2>
         {error ? (
           <p className="muted">{error}</p>
+        ) : status === 'reading' ? (
+          <p className="muted">Reading label on-device… this can take a few seconds.</p>
         ) : (
           <>
             <video ref={videoRef} autoPlay playsInline muted className="scan-preview" />
             <p className="muted small">
-              Point the camera at the bottle or box label, then capture. Automatic label reading isn’t built yet
-              in this MVP — capturing a photo will open the form below so you can enter the details in a few
-              seconds.
+              Point the camera at the bottle or box label, then capture. Text recognition runs on your device and
+              gives a best-effort guess — you'll get a chance to fix anything it misreads.
             </p>
           </>
         )}
         <div className="modal-actions">
-          <button className="ghost" onClick={onClose}>
+          <button className="ghost" onClick={onClose} disabled={status === 'reading'}>
             Cancel
           </button>
-          {!error && (
+          {!error && status === 'camera' && (
             <button className="primary" onClick={capture}>
               Capture
             </button>

@@ -1,4 +1,5 @@
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { currentStreak } from '../lib/adherence'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -11,12 +12,10 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function Today() {
   const { state, recordDose } = useApp()
-  const todayKey = new Date().toISOString().slice(0, 10)
-  const streak = currentStreak(state.doseEvents)
+  const { user } = useAuth()
+  const streak = currentStreak(state.history)
 
-  const todaysDoses = state.doseEvents
-    .filter((e) => e.scheduledFor.slice(0, 10) === todayKey)
-    .sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor))
+  const todaysDoses = [...state.doseEvents].sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor))
 
   return (
     <div className="screen">
@@ -25,7 +24,7 @@ export default function Today() {
         {streak > 0 && <span className="streak-badge">🔥 {streak}-day streak</span>}
       </div>
 
-      {!state.consents.reminders && (
+      {!user?.consents.reminders && (
         <p className="hint">
           Reminder notifications are off. Turn them on in Settings → Privacy to get alerted at dose time.
         </p>

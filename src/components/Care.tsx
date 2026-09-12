@@ -1,16 +1,24 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import { downloadCsv, openDoctorReport } from '../lib/export'
+
+const DELIVERY_LABEL: Record<string, string> = {
+  sent: '✅ sent',
+  failed: '⚠️ failed',
+  logged: '📝 logged only (no provider configured)',
+}
 
 export default function Care() {
   const { state, addCaregiver, updateCaregiver, deleteCaregiver } = useApp()
+  const { user } = useAuth()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !phone.trim()) return
-    addCaregiver({ name: name.trim(), phone: phone.trim(), consentGiven: false })
+    addCaregiver({ name: name.trim(), phone: phone.trim() })
     setName('')
     setPhone('')
   }
@@ -18,7 +26,7 @@ export default function Care() {
   return (
     <div className="screen">
       <h2>Caregivers</h2>
-      {!state.consents.caregiverAlerts && (
+      {!user?.consents.caregiverAlerts && (
         <p className="hint">
           Caregiver alerts are off. Turn them on in Settings → Privacy before adding contacts here.
         </p>
@@ -59,25 +67,27 @@ export default function Care() {
       <h2 className="section-gap">Doctor-ready export</h2>
       <p className="muted small">Share a summary of logged doses with a clinician.</p>
       <div className="modal-actions">
-        <button className="ghost" onClick={() => downloadCsv(state)}>
+        <button className="ghost" onClick={() => downloadCsv({ medications: state.medications, doseEvents: state.history })}>
           Download CSV
         </button>
-        <button className="ghost" onClick={() => openDoctorReport(state)}>
+        <button className="ghost" onClick={() => openDoctorReport({ medications: state.medications, doseEvents: state.history })}>
           Print / save PDF
         </button>
       </div>
 
       <h2 className="section-gap">Alert log</h2>
       <p className="muted small">
-        SMS/WhatsApp fallback and caregiver alerts are simulated in this MVP (no carrier connected yet) — this log
-        shows exactly what would have been sent.
+        SMS/WhatsApp fallback and caregiver alerts are sent by the server. Without a configured provider, attempts
+        are recorded here as "logged only" instead of actually sent — see the backend README for wiring up Twilio.
       </p>
       {state.alertLog.length === 0 && <p className="muted">No alerts sent yet.</p>}
       <ul className="alert-log">
         {[...state.alertLog].reverse().map((a) => (
           <li key={a.id}>
             <span className="badge">{a.channel}</span> to <strong>{a.target}</strong>: {a.message}
-            <div className="muted small">{new Date(a.sentAt).toLocaleString()}</div>
+            <div className="muted small">
+              {DELIVERY_LABEL[a.delivery] ?? a.delivery} · {new Date(a.sentAt).toLocaleString()}
+            </div>
           </li>
         ))}
       </ul>

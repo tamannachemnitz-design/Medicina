@@ -41,6 +41,8 @@ export interface ConsentState {
 
 export type AlertChannel = 'push' | 'sms-whatsapp-fallback' | 'caregiver-alert'
 
+export type AlertDelivery = 'sent' | 'failed' | 'logged'
+
 export interface AlertLogEntry {
   id: string
   channel: AlertChannel
@@ -48,14 +50,21 @@ export interface AlertLogEntry {
   doseEventId: string
   target: string
   message: string
+  delivery: AlertDelivery
   sentAt: string
 }
 
-export interface AppState {
-  onboarded: boolean
+export interface User {
+  id: string
+  email: string
+  phone: string | null
   consents: ConsentState
+}
+
+export interface AppState {
   medications: Medication[]
-  doseEvents: DoseEvent[]
+  doseEvents: DoseEvent[] // today only
+  history: DoseEvent[] // last ~90 days, for streaks/adherence/export
   caregivers: Caregiver[]
   alertLog: AlertLogEntry[]
 }
@@ -68,10 +77,9 @@ export const DEFAULT_CONSENTS: ConsentState = {
 }
 
 export const INITIAL_STATE: AppState = {
-  onboarded: false,
-  consents: DEFAULT_CONSENTS,
   medications: [],
   doseEvents: [],
+  history: [],
   caregivers: [],
   alertLog: [],
 }
